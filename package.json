@@ -1,0 +1,24 @@
+{
+  "name": "openid-tls-connector",
+  "module": "src/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/index.ts"
+  },
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@ldapjs/dn": "^1.1.0",
+    "@openauthjs/openauth": "^0.4.3",
+    "@types/ldapjs": "^3.0.6",
+    "commander": "^15.0.0",
+    "ldapjs": "^3.0.7",
+    "ts-pattern": "^5.9.0",
+    "valibot": "^1.4.2"
+  }
+}
