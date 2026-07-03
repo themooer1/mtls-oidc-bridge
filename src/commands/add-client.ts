@@ -25,7 +25,7 @@ export type AddClientConfig = v.InferOutput<typeof AddClientConfigSchema>;
 // ---------------------------------------------------------------------------
 
 export async function addClient(clientId: string, config: AddClientConfig): Promise<void> {
-    const backend = createClientsBackend(config);
+    const backend = await createClientsBackend(config);
 
     const existing = await backend.getClient(clientId);
     if (existing) {
@@ -37,7 +37,7 @@ export async function addClient(clientId: string, config: AddClientConfig): Prom
 
     if (config.type === 'public') {
         client = { id: clientId, type: 'public', redirect_uri: config.redirectUri };
-        await backend.saveClient(client);
+        await backend.setClient(client);
         console.log(`✅  Registered public client "${clientId}" (no secret).`);
     } else {
         // Generate a cryptographically random secret (32 bytes → 64 hex chars)
@@ -45,7 +45,7 @@ export async function addClient(clientId: string, config: AddClientConfig): Prom
         const hashed_secret = await Bun.password.hash(rawSecret, { algorithm: 'bcrypt' });
 
         client = { id: clientId, type: 'private', hashed_secret, redirect_uri: config.redirectUri };
-        await backend.saveClient(client);
+        await backend.setClient(client);
 
         console.log(`✅  Registered private client "${clientId}".`);
         console.log(`\n🔑  Client secret (shown once — store it securely):`);
@@ -74,5 +74,5 @@ export const addClientCmd = new Command('add-client')
 
 clientsBackendOptions().forEach((o) => addClientCmd.addOption(o));
 
-addClientCmd.action((clientId: string, opts) =>
-    addClient(clientId, v.parse(AddClientConfigSchema, opts)));
+addClientCmd.action(async (clientId: string, opts) =>
+    await addClient(clientId, v.parse(AddClientConfigSchema, opts)));

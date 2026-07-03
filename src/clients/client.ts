@@ -8,9 +8,11 @@
 // Client type
 // ---------------------------------------------------------------------------
 
+export type ClientID = string
+
 /** Base class for OIDC Relying Party client definitions */
 interface ClientBase {
-    readonly id: string;
+    readonly id: ClientID;
     readonly redirect_uri: string;
 }
 
@@ -39,9 +41,7 @@ export type Client = PublicClient | PrivateClient;
  */
 export interface ClientsBackend {
     /** Retrieve a client by its ID, or `null` if not found. */
-    getClient(clientId: string): Promise<Client | null>;
+    getClient(clientId: ClientID): Promise<Client | null>;
     /** Persist a new or updated client record. */
-    saveClient(client: Client): Promise<void>;
-    /** Return all registered clients. */
-    listClients(): Promise<Client[]>;
+    setClient(client: Client): Promise<void>;
 }

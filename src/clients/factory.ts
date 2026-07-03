@@ -7,9 +7,9 @@ import { FileClientsBackend } from "./file";
 // ---------------------------------------------------------------------------
 
 /** Instantiate the correct {@link ClientsBackend} from a config object. */
-export function createClientsBackend(config: ClientsBackendConfig): ClientsBackend {
+export async function createClientsBackend(config: ClientsBackendConfig): Promise<ClientsBackend> {
     switch (config.clientsBackend) {
         case 'file':
-            return new FileClientsBackend(config);
+            return await FileClientsBackend.createInstance(config);
     }
 }

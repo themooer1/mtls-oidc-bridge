@@ -26,8 +26,8 @@ export type RunConfig = v.InferOutput<typeof RunConfigSchema>;
 // ---------------------------------------------------------------------------
 
 export async function run(config: RunConfig): Promise<void> {
-    const clientBackend = createClientBackend(config);
-    const userBackend = createUserBackend(config);
+    const clientBackend = await createClientBackend(config);
+    const userBackend = await createUserBackend(config);
 
     const app = createApp(config.userCertificateHeader, userBackend, clientBackend);
 

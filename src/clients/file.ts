@@ -1,15 +1,17 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { exists, readFile, writeFile } from 'node:fs/promises';
+import type { Client, ClientsBackend, ClientID } from "./client";
+import { ConfigFile } from '../util/config_file';
 
 // ---------------------------------------------------------------------------
 // File-based backend
 // ---------------------------------------------------------------------------
 
-import type { Client, ClientsBackend } from "./client";
-
 export interface FileClientsBackendConfig {
     /** Path to the JSON file used as the client store. */
     clientsFilePath: string;
 }
+
+type ClientsConfigFile = ConfigFile<Record<ClientID, Client>>;
 
 /**
  * Simple file-based {@link ClientsBackend} that stores clients as a JSON array.
@@ -18,29 +20,20 @@ export interface FileClientsBackendConfig {
  * picked up. Writes are atomic (full file rewrite).
  */
 export class FileClientsBackend implements ClientsBackend {
-    constructor(private readonly config: FileClientsBackendConfig) {}
+    static async createInstance(config: FileClientsBackendConfig, create: boolean = false) {
+        const configFile: ClientsConfigFile = await ConfigFile.open(config.clientsFilePath, create);
 
-    private readAll(): Client[] {
-        const { clientsFilePath: filePath } = this.config;
-        if (!existsSync(filePath)) return [];
-        const raw = readFileSync(filePath, 'utf-8');
-        return JSON.parse(raw) as Client[];
+        return new FileClientsBackend(configFile);
     }
 
-    private writeAll(clients: Client[]): void {
-        writeFileSync(this.config.clientsFilePath, JSON.stringify(clients, null, 2) + '\n', 'utf-8');
+    private constructor(private readonly config: ClientsConfigFile) {}
+
+    async getClient(clientId: ClientID): Promise<Client | null> {
+        return this.config.data[clientId] ?? null;
     }
 
-    async getClient(clientId: string): Promise<Client | null> {
-        return this.readAll().find((c) => c.id === clientId) ?? null;
-    }
-
-    async saveClient(client: Client): Promise<void> {
-        const all = this.readAll().filter((c) => c.id !== client.id);
-        this.writeAll([...all, client]);
-    }
-
-    async listClients(): Promise<Client[]> {
-        return this.readAll();
+    async setClient(client: Client): Promise<void> {
+        this.config.data[client.id] = client;
+        await this.config.save();
     }
 }

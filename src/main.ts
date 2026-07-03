@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { runCmd } from './commands/run';
 import { addClientCmd } from './commands/add-client';
+import { addUserCmd } from './commands/add-user';
 
 const program = new Command()
     .name('openid-tls-connector')
@@ -9,5 +10,6 @@ const program = new Command()
 
 program.addCommand(runCmd);
 program.addCommand(addClientCmd);
+program.addCommand(addUserCmd);
 
 program.parse(Bun.argv);

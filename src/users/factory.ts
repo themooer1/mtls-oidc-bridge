@@ -8,11 +8,11 @@ import type { UserBackend } from "./users";
 // ---------------------------------------------------------------------------
 
 /** Instantiate the correct {@link UserBackend} from a config object. */
-export function createUserBackend(config: UserBackendConfig): UserBackend {
+export async function createUserBackend(config: UserBackendConfig): Promise<UserBackend> {
     switch (config.userBackend) {
         case 'file':
-            return new FileUserBackend(config);
+            return await FileUserBackend.createInstance(config);
         case 'ldap':
-            return new LdapUserBackend(config);
+            return await LdapUserBackend.createInstance(config);
     }
 }

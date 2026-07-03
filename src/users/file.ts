@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 
 import { UserClaimsSchema, type UserBackend, type UserClaims } from "./users";
-import { readFile, writeFile } from 'node:fs/promises';
+import { ConfigFile } from '../util/config_file';
 
 export interface FileUserBackendConfig {
     /** Path to the JSON file used as the user store. */
@@ -15,6 +15,8 @@ type UserDN = string;
 const FileUserDBSchema = v.record(v.string(), UserClaimsSchema);
 type FileUserDB = v.InferOutput<typeof FileUserDBSchema>;
 
+type FileUserConfigFile = ConfigFile<FileUserDB>;
+
 /**
  * Simple file-based {@link UserBackend} that stores users as a JSON array of UserClaims.
  *
@@ -22,42 +24,36 @@ type FileUserDB = v.InferOutput<typeof FileUserDBSchema>;
  * picked up. Writes are atomic (full file rewrite).
  */
 export class FileUserBackend implements UserBackend {
-    private users: FileUserDB = {};
+    static async createInstance(
+        config: FileUserBackendConfig,
+        create: boolean = false,
+    ): Promise<FileUserBackend> {
+        const configFile: FileUserConfigFile = await ConfigFile.open(
+            config.userFilePath,
+            create,
+        );
 
-    constructor(private readonly config: FileUserBackendConfig) {
-        this.readAll()
+        return new FileUserBackend(configFile);
     }
 
-    /**
-     * Load users from file
-     */
-    async readAll() {
-        const raw = await readFile(this.config.userFilePath, 'utf-8');
-        this.users = v.parse(FileUserDBSchema, JSON.parse(raw))
-    }
+    private constructor(private readonly config: FileUserConfigFile) {}
 
     /**
-     * Write users to file
-     */
-    async writeAll() {
-        await writeFile(this.config.userFilePath, JSON.stringify(this.users, null, 2) + '\n', 'utf-8');
-    }
-
-    /**
-     * Add a user to the in memory DB (call writeAll to write to file)
-     * @param identifier DN of the user 
-     * @param claims OIDC claims about the user
-     */
-    async add(identifier: UserDN, claims: UserClaims) {
-        this.users[identifier] = claims;
-    }
-
-    /**
-     * Gets claims about a user (implements UserBackend)
-     * @param identifier DN of the user
-     * @returns Claims about the user or null if the user isn't in the DB
+     * Gets claims about a user.
+     * @param identifier DN of the user.
+     * @returns Claims about the user or null if the user isn't in the DB.
      */
     async getClaims(identifier: UserDN): Promise<UserClaims | null> {
-        return this.users[identifier] ?? null;
+        return this.config.data[identifier] ?? null;
+    }
+
+    /**
+     * Adds or updates a user.
+     * @param identifier DN of the user.
+     * @param claims OIDC claims about the user.
+     */
+    async set(identifier: UserDN, claims: UserClaims): Promise<void> {
+        this.config.data[identifier] = claims;
+        await this.config.save();
     }
 }
