@@ -10,6 +10,6 @@ import { FileClientsBackend } from "./file";
 export async function createClientsBackend(config: ClientsBackendConfig): Promise<ClientsBackend> {
     switch (config.clientsBackend) {
         case 'file':
-            return await FileClientsBackend.createInstance(config);
+            return await FileClientsBackend.createInstance(config, true);
     }
 }
