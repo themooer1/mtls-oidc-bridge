@@ -13,7 +13,7 @@ import * as crypto from 'crypto';
 export const AddClientConfigSchema = v.intersect([
     v.object({
         type: v.union([v.literal('public'), v.literal('private')]),
-        redirectUri: v.string(),
+        redirectUris: v.array(v.string()),
     }),
     ClientsBackendConfigSchema,
 ]);
@@ -36,7 +36,7 @@ export async function addClient(clientId: string, config: AddClientConfig): Prom
     let client: Client;
 
     if (config.type === 'public') {
-        client = { id: clientId, type: 'public', redirect_uri: config.redirectUri };
+        client = { id: clientId, type: 'public', redirect_uris: config.redirectUris };
         await backend.setClient(client);
         console.log(`✅  Registered public client "${clientId}" (no secret).`);
     } else {
@@ -44,7 +44,7 @@ export async function addClient(clientId: string, config: AddClientConfig): Prom
         const rawSecret = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex');
         const hashed_secret = await Bun.password.hash(rawSecret, { algorithm: 'bcrypt' });
 
-        client = { id: clientId, type: 'private', hashed_secret, redirect_uri: config.redirectUri };
+        client = { id: clientId, type: 'private', hashed_secret, redirect_uris: config.redirectUris };
         await backend.setClient(client);
 
         console.log(`✅  Registered private client "${clientId}".`);
@@ -69,7 +69,12 @@ export const addClientCmd = new Command('add-client')
     )
     .addOption(
         new Option('--redirect-uri <uri>', 'Allowed redirect URI for this client')
-            .makeOptionMandatory(true),
+            .makeOptionMandatory()
+            .argParser((value: string, previous: string[] = []) => {
+                previous.push(value);
+                return previous;
+            })
+            ,
     );
 
 clientsBackendOptions().forEach((o) => addClientCmd.addOption(o));

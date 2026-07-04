@@ -14,5 +14,5 @@ export const makeClientRedirectVerifier: ClientRedirectVerifierBuilder =
                 // This client isn't registered
                 return false
 
-            return client.redirect_uri === input.redirectURI
+            return client.redirect_uris.indexOf(input.redirectURI) !== -1
         }

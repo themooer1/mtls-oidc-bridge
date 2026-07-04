@@ -13,7 +13,7 @@ export type ClientID = string
 /** Base class for OIDC Relying Party client definitions */
 interface ClientBase {
     readonly id: ClientID;
-    readonly redirect_uri: string;
+    readonly redirect_uris: string[];
 }
 
 /** A public client (no client secret — e.g. a SPA or native app). */
