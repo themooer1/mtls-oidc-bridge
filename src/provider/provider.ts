@@ -5,6 +5,7 @@
  */
 import type { Provider } from "@openauthjs/openauth/provider/provider";
 import { OauthError } from "@openauthjs/openauth/error";
+import type { HeaderParser } from "./header/header_parser";
 
 class MissingAuthHeaderError extends OauthError {
   constructor() {
@@ -19,15 +20,20 @@ export interface TrustedHeaderProviderConfig {
    * @example "X-Forwarded-Client-Cert"
    */
   header: string,
+
+  /**
+   * Function which takes the header value and extracts a unique identifier for the user.
+   */
+  getUserIdentifier: HeaderParser
 }
 
 type TrustedHeaderProviderClaims = {
-  header: string,
+  identifier: string,
 }
 
 export function TrustedHeaderProvider
 (config: TrustedHeaderProviderConfig): Provider<{ claims: TrustedHeaderProviderClaims }> {
-  const { header } = config;
+  const { header, getUserIdentifier } = config;
 
   return {
     type: "mtls",
@@ -44,7 +50,7 @@ export function TrustedHeaderProvider
         // Log in the subject identified in the proxy header
         return ctx.forward(
             c,
-            await ctx.success(c, {claims: {header: subject}}))
+            await ctx.success(c, {claims: {identifier: getUserIdentifier(subject)}}))
       })
     },
   }

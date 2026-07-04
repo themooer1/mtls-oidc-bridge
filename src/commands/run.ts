@@ -29,7 +29,7 @@ export async function run(config: RunConfig): Promise<void> {
     const clientBackend = await createClientBackend(config);
     const userBackend = await createUserBackend(config);
 
-    const app = createApp(config.userCertificateHeader, userBackend, clientBackend);
+    const app = createApp(config, userBackend, clientBackend);
 
     console.log(`🚀  Starting OpenAuth server on port ${config.port}…`);
     Bun.serve({ port: config.port, fetch: app.fetch });
@@ -45,7 +45,12 @@ export const runCmd = new Command('run')
     .addOption(new Option(
         '--user-certificate-header <header>',
         'Trusted HTTP header injected by the reverse proxy',
-    ).env('USER_CERTIFICATE_HEADER').makeOptionMandatory());
+    ).env('USER_CERTIFICATE_HEADER').makeOptionMandatory())
+    .addOption(new Option(
+        '--user-certificate-header-type <type>',
+        'Format of the HTTP header injected by the reverse proxy (identity|xfcc). "identity" header value is used as-is to lookup user. "xfcc" header is treated like X-Forwarded-Client-Cert from Envoy or X-Forwarded-Tls-Client-Cert-Info from Traefik and the Subject is parsed out as the user identifier.'
+
+    ).env('USER_CERTIFICATE_HEADER_TYPE').choices(['identity', 'xfcc']).makeOptionMandatory());
 
 userBackendOptions().forEach((o) => runCmd.addOption(o));
 clientsBackendOptions().forEach((o) => runCmd.addOption(o));
