@@ -1,0 +1,8 @@
+FROM alpine:3.22
+
+RUN apk add --no-cache openssl
+
+COPY generate-certs.sh /usr/local/bin/generate-certs.sh
+
+ENTRYPOINT ["/usr/local/bin/generate-certs.sh"]
+

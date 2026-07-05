@@ -1,0 +1,35 @@
+{
+  "oidcc-client": {
+    "id": "oidcc-client",
+    "type": "private",
+    "hashed_secret": "$2b$10$sb/g6qCQ0b3njuP/YdWH9e9Ucvo8NkDfwsGLWN0yCf/YJQ9Mw4MVS",
+    "redirect_uris": [
+      "https://localhost.emobix.co.uk:8443/test/a/mtls-op/callback",
+      "https://localhost.emobix.co.uk:8443/test/a/mtls-op/callback?bar=foo",
+      "https://localhost:8443/test/a/mtls-op/callback",
+      "https://localhost:8443/test/a/mtls-op/callback?bar=foo"
+    ]
+  },
+  "oidcc-client-post": {
+    "id": "oidcc-client-post",
+    "type": "private",
+    "hashed_secret": "$2b$10$sb/g6qCQ0b3njuP/YdWH9e9Ucvo8NkDfwsGLWN0yCf/YJQ9Mw4MVS",
+    "redirect_uris": [
+      "https://localhost.emobix.co.uk:8443/test/a/mtls-op/callback",
+      "https://localhost.emobix.co.uk:8443/test/a/mtls-op/callback?bar=foo",
+      "https://localhost:8443/test/a/mtls-op/callback",
+      "https://localhost:8443/test/a/mtls-op/callback?bar=foo"
+    ]
+  },
+  "oidcc-client-2": {
+    "id": "oidcc-client-2",
+    "type": "private",
+    "hashed_secret": "$2b$10$sb/g6qCQ0b3njuP/YdWH9e9Ucvo8NkDfwsGLWN0yCf/YJQ9Mw4MVS",
+    "redirect_uris": [
+      "https://localhost.emobix.co.uk:8443/test/a/mtls-op/callback",
+      "https://localhost.emobix.co.uk:8443/test/a/mtls-op/callback?bar=foo",
+      "https://localhost:8443/test/a/mtls-op/callback",
+      "https://localhost:8443/test/a/mtls-op/callback?bar=foo"
+    ]
+  }
+}

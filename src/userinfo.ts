@@ -1,6 +1,7 @@
 import type { StorageAdapter } from "@openauthjs/openauth/storage/storage";
 import { legacySigningKeys, signingKeys } from "@openauthjs/openauth/keys";
 import type { Hono } from "hono";
+import type { Context } from "hono";
 import { jwtVerify } from "jose";
 
 type AccessTokenPayload = {
@@ -17,7 +18,7 @@ const issuerFor = (url: string): string => new URL(url).origin;
 const addDiscoveryCorsHeaders = (headers: Headers): void => {
     headers.set("Access-Control-Allow-Origin", "*");
     headers.set("Access-Control-Allow-Headers", "*");
-    headers.set("Access-Control-Allow-Methods", "GET");
+    headers.set("Access-Control-Allow-Methods", "GET, POST");
 };
 
 /**
@@ -38,6 +39,7 @@ export const registerUserInfoRoutes = (app: Hono, storage: StorageAdapter): void
             jwks_uri: `${issuer}/.well-known/jwks.json`,
             userinfo_endpoint: `${issuer}/userinfo`,
             response_types_supported: ["code", "token"],
+            token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
         };
     };
 
@@ -51,9 +53,13 @@ export const registerUserInfoRoutes = (app: Hono, storage: StorageAdapter): void
         return c.json(discovery(c.req.url));
     });
 
-    app.get("/userinfo", async (c) => {
+    const userInfo = async (c: Context) => {
         const authorization = c.req.header("authorization");
-        const token = authorization?.match(/^Bearer (.+)$/i)?.[1];
+        let token = authorization?.match(/^Bearer (.+)$/i)?.[1];
+        if (!token && c.req.method === "POST") {
+            const form = await c.req.formData();
+            token = form.get("access_token")?.toString();
+        }
         if (!token)
             return c.json({ error: "invalid_token" }, 401);
 
@@ -78,5 +84,8 @@ export const registerUserInfoRoutes = (app: Hono, storage: StorageAdapter): void
             return c.json({ error: "invalid_token" }, 401);
 
         return c.json(payload.properties);
-    });
+    };
+
+    app.get("/userinfo", userInfo);
+    app.post("/userinfo", userInfo);
 };

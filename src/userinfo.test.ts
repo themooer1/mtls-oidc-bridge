@@ -53,6 +53,45 @@ describe("userinfo routes", () => {
         });
     });
 
+    test("accepts bearer tokens from POST headers and bodies", async () => {
+        const storage = MemoryStorage();
+        const app = new Hono();
+        registerUserInfoRoutes(app, storage);
+
+        const token = await createAccessToken(storage, {
+            mode: "access",
+            type: "user",
+            aud: "client",
+            iss: "http://localhost",
+            sub: "icecream",
+            properties: {
+                sub: "icecream",
+                name: "Ice Cream",
+            },
+        });
+
+        const headerResponse = await app.request("http://localhost/userinfo", {
+            method: "POST",
+            headers: { authorization: `Bearer ${token}` },
+        });
+        expect(headerResponse.status).toBe(200);
+        expect(await headerResponse.json()).toEqual({
+            sub: "icecream",
+            name: "Ice Cream",
+        });
+
+        const bodyResponse = await app.request("http://localhost/userinfo", {
+            method: "POST",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ access_token: token }),
+        });
+        expect(bodyResponse.status).toBe(200);
+        expect(await bodyResponse.json()).toEqual({
+            sub: "icecream",
+            name: "Ice Cream",
+        });
+    });
+
     test("rejects requests without a bearer token", async () => {
         const storage = MemoryStorage();
         const app = new Hono();

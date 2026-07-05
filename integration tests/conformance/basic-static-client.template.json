@@ -1,0 +1,34 @@
+{
+  "description": "openid-tls-connector mTLS auto-login",
+  "alias": "mtls-op",
+  "server": {
+    "discoveryUrl": "${OP_BASE_URL}/.well-known/openid-configuration"
+  },
+  "client": {
+    "client_id": "oidcc-client",
+    "client_secret": "unused-by-openid-tls-connector"
+  },
+  "client_secret_post": {
+    "client_id": "oidcc-client-post",
+    "client_secret": "unused-by-openid-tls-connector"
+  },
+  "client2": {
+    "client_id": "oidcc-client-2",
+    "client_secret": "unused-by-openid-tls-connector"
+  },
+  "browser": [
+    {
+      "match": "${OP_BASE_URL}/*",
+      "tasks": [
+        {
+          "task": "Verify callback",
+          "match": "*/test/*/callback*",
+          "commands": [
+            ["wait", "id", "submission_complete", 10]
+          ]
+        }
+      ]
+    }
+  ]
+}
+

@@ -1,0 +1,8 @@
+{
+  "CN=mtls-conformance-user": {
+    "sub": "mtls-conformance-user",
+    "name": "mTLS Conformance User",
+    "email": "mtls-conformance-user@example.test"
+  }
+}
+

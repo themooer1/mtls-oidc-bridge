@@ -1,0 +1,83 @@
+name: openid-tls-connector-integration
+
+services:
+  certs:
+    build:
+      context: ./certs
+    volumes:
+      - ./.generated-certs:/certs
+
+  echo-backend:
+    build:
+      context: ./echo-backend
+    expose:
+      - "9000"
+
+  op:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command:
+      - --log-level
+      - debug
+      - run
+      - --port
+      - "3000"
+      - --user-certificate-header
+      - x-forwarded-client-cert
+      - --user-certificate-header-type
+      - xfcc
+      - --user-backend
+      - file
+      - --user-file-path
+      - /config/users.json
+      - --clients-backend
+      - file
+      - --clients-file-path
+      - /config/clients.json
+    volumes:
+      - ./op-config:/config:ro
+    expose:
+      - "3000"
+
+  mtls-edge:
+    image: envoyproxy/envoy:v1.31-latest
+    command:
+      - envoy
+      - -c
+      - /etc/envoy/envoy.yaml
+      - --log-level
+      - info
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+      echo-backend:
+        condition: service_started
+      op:
+        condition: service_started
+    ports:
+      - "10080:10080"
+      - "10443:10443"
+      - "19443:19443"
+    volumes:
+      - ./envoy/mtls-edge.yaml:/etc/envoy/envoy.yaml:ro
+      - ./.generated-certs:/certs:ro
+
+  cert-client-proxy:
+    image: envoyproxy/envoy:v1.31-latest
+    command:
+      - envoy
+      - -c
+      - /etc/envoy/envoy.yaml
+      - --log-level
+      - info
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+      mtls-edge:
+        condition: service_started
+    ports:
+      - "18080:18080"
+    volumes:
+      - ./envoy/cert-client-proxy.yaml:/etc/envoy/envoy.yaml:ro
+      - ./.generated-certs:/certs:ro

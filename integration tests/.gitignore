@@ -1,0 +1,7 @@
+.generated-certs/
+.conformance-python/
+.generated-conformance-config.json
+results/
+!op-config/
+!op-config/clients.json
+!op-config/users.json
