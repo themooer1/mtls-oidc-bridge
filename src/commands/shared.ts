@@ -38,3 +38,14 @@ export const clientsBackendOptions = () => [
         '[file backend] Path to the clients JSON store',
     ).env('CLIENTS_FILE_PATH'),
 ];
+
+/**
+ * CLI Options for the global logger.
+ * Returns a fresh array each call so Commander doesn't reuse Option instances.
+ */
+export const loggerOptions = () => [
+    new Option(
+        '--log-level <level>',
+        'Global log level (debug|info|warn|error)',
+    ).env('LOG_LEVEL').choices(['debug', 'info', 'warn', 'error']).default('info'),
+];

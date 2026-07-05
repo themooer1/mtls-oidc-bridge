@@ -7,6 +7,7 @@ import { UserBackendConfigSchema } from '../users/config';
 import { ClientsBackendConfigSchema } from '../clients/config';
 import { userBackendOptions, clientsBackendOptions } from './shared';
 import { createClientsBackend as createClientBackend } from '../clients/factory';
+import { log } from '../logger';
 
 // ---------------------------------------------------------------------------
 // Config schema
@@ -31,7 +32,7 @@ export async function run(config: RunConfig): Promise<void> {
 
     const app = createApp(config, userBackend, clientBackend);
 
-    console.log(`🚀  Starting OpenAuth server on port ${config.port}…`);
+    log.info(`Starting OpenAuth server on port ${config.port}`);
     Bun.serve({ port: config.port, fetch: app.fetch });
 }
 

@@ -1,4 +1,3 @@
-import { exists, readFile, writeFile } from 'node:fs/promises';
 import type { Client, ClientsBackend, ClientID } from "./client";
 import { ConfigFile } from '../util/config_file';
 
