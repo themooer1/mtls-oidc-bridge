@@ -27,7 +27,7 @@ describe("FileClientsBackend", () => {
             freezer: {
                 id: "freezer",
                 type: "public",
-                redirect_uris: ["https://auth.cone.com/callback"],
+                redirect_uris: ["https://rp.cone.com/callback"],
             },
         });
         const backend = await FileClientsBackend.createInstance({ clientsFilePath: path });
@@ -35,7 +35,7 @@ describe("FileClientsBackend", () => {
         expect(await backend.getClient("freezer")).toEqual({
             id: "freezer",
             type: "public",
-            redirect_uris: ["https://auth.cone.com/callback"],
+            redirect_uris: ["https://rp.cone.com/callback"],
         });
         expect(await backend.getClient("missing")).toBeNull();
     });
@@ -47,14 +47,14 @@ describe("FileClientsBackend", () => {
         await backend.setClient({
             id: "waffle-cone",
             type: "public",
-            redirect_uris: ["https://auth.cone.com/openid/callback"],
+            redirect_uris: ["https://rp.cone.com/openid/callback"],
         });
 
         expect(JSON.parse(await readFile(path, "utf8"))).toEqual({
             "waffle-cone": {
                 id: "waffle-cone",
                 type: "public",
-                redirect_uris: ["https://auth.cone.com/openid/callback"],
+                redirect_uris: ["https://rp.cone.com/openid/callback"],
             },
         });
 
@@ -64,7 +64,7 @@ describe("FileClientsBackend", () => {
 
         expect(await verifier({
             clientID: "waffle-cone",
-            redirectURI: "https://auth.cone.com/openid/callback",
+            redirectURI: "https://rp.cone.com/openid/callback",
         }, new Request("https://auth.cone.com/authorize"))).toBe(true);
         expect(await verifier({
             clientID: "waffle-cone",
