@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createLocalJWKSet, jwtVerify, type JSONWebKeySet } from "jose";
+import { createLocalJWKSet, decodeProtectedHeader, jwtVerify, type JSONWebKeySet } from "jose";
 
 import type { ClientsBackend, Client } from "./clients/client";
 import { createApp } from "./server";
@@ -134,6 +134,7 @@ describe("createApp", () => {
         expect(typeof payload["access_token"]).toBe("string");
         expect(typeof payload["refresh_token"]).toBe("string");
         expect(typeof payload["id_token"]).toBe("string");
+        expect(decodeProtectedHeader(payload["id_token"] as string).alg).toBe("ES256");
 
         const jwksResponse = await app.request("http://auth.example/.well-known/jwks.json");
         expect(jwksResponse.status).toBe(200);

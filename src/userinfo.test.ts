@@ -127,20 +127,34 @@ describe("userinfo routes", () => {
         expect(await response.json()).toEqual({ error: "invalid_token" });
     });
 
-    test("advertises the userinfo endpoint in discovery metadata", async () => {
+    test("advertises supported OIDC capabilities in discovery metadata", async () => {
         const storage = MemoryStorage();
         const app = new Hono();
         registerUserInfoRoutes(app, storage);
 
-        const response = await app.request("https://auth.cone.com/.well-known/openid-configuration");
-
-        expect(response.status).toBe(200);
-        expect(await response.json()).toMatchObject({
+        const expected = {
             issuer: "https://auth.cone.com",
             authorization_endpoint: "https://auth.cone.com/authorize",
             token_endpoint: "https://auth.cone.com/token",
             jwks_uri: "https://auth.cone.com/.well-known/jwks.json",
             userinfo_endpoint: "https://auth.cone.com/userinfo",
-        });
+            response_types_supported: ["code", "token"],
+            grant_types_supported: ["authorization_code", "refresh_token"],
+            scopes_supported: ["openid", "profile", "email"],
+            subject_types_supported: ["public"],
+            id_token_signing_alg_values_supported: ["ES256"],
+            token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
+            claims_supported: ["sub", "name", "email", "preferred_username"],
+        };
+
+        const oidcResponse = await app.request("https://auth.cone.com/.well-known/openid-configuration");
+
+        expect(oidcResponse.status).toBe(200);
+        expect(await oidcResponse.json()).toEqual(expected);
+
+        const oauthResponse = await app.request("https://auth.cone.com/.well-known/oauth-authorization-server");
+
+        expect(oauthResponse.status).toBe(200);
+        expect(await oauthResponse.json()).toEqual(expected);
     });
 });

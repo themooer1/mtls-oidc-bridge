@@ -39,7 +39,12 @@ export const registerUserInfoRoutes = (app: Hono, storage: StorageAdapter): void
             jwks_uri: `${issuer}/.well-known/jwks.json`,
             userinfo_endpoint: `${issuer}/userinfo`,
             response_types_supported: ["code", "token"],
+            grant_types_supported: ["authorization_code", "refresh_token"],
+            scopes_supported: ["openid", "profile", "email"],
+            subject_types_supported: ["public"],
+            id_token_signing_alg_values_supported: ["ES256"],
             token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
+            claims_supported: ["sub", "name", "email", "preferred_username"],
         };
     };
 
