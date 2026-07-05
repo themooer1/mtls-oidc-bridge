@@ -5,8 +5,8 @@ import { XFCCHeaderParser } from "./xfcc";
 
 describe("XFCCHeaderParser", () => {
     test("extracts only the Subject DN from an XFCC header", () => {
-        expect(XFCCHeaderParser('Hash=e078a93dc34fdfe8d43a878c1891088dfe3bde65d8df6af6657271a0f98cdaf7;Subject="emailAddress=david@mooblek.com,CN=David Smith,C=US"'))
-            .toBe("emailAddress=david@mooblek.com,CN=David Smith,C=US");
+        expect(XFCCHeaderParser('Hash=e078a93dc34fdfe8d43a878c1891088dfe3bde65d8df6af6657271a0f98cdaf7;Subject="emailAddress=icecream@cone.com,CN=Ice Cream,C=US"'))
+            .toBe("emailAddress=icecream@cone.com,CN=Ice Cream,C=US");
     });
 
     test("extracts subjects on repeated parses", () => {

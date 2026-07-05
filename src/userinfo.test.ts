@@ -31,12 +31,12 @@ describe("userinfo routes", () => {
             type: "user",
             aud: "client",
             iss: "http://localhost",
-            sub: "david",
+            sub: "icecream",
             properties: {
-                sub: "david",
-                preferred_username: "david",
-                name: "David Smith",
-                email: "david@mooblek.com",
+                sub: "icecream",
+                preferred_username: "icecream",
+                name: "Ice Cream",
+                email: "icecream@cone.com",
             },
         });
 
@@ -46,10 +46,10 @@ describe("userinfo routes", () => {
 
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({
-            sub: "david",
-            preferred_username: "david",
-            name: "David Smith",
-            email: "david@mooblek.com",
+            sub: "icecream",
+            preferred_username: "icecream",
+            name: "Ice Cream",
+            email: "icecream@cone.com",
         });
     });
 
@@ -93,15 +93,15 @@ describe("userinfo routes", () => {
         const app = new Hono();
         registerUserInfoRoutes(app, storage);
 
-        const response = await app.request("https://moqi.mooblek.com/.well-known/openid-configuration");
+        const response = await app.request("https://auth.cone.com/.well-known/openid-configuration");
 
         expect(response.status).toBe(200);
         expect(await response.json()).toMatchObject({
-            issuer: "https://moqi.mooblek.com",
-            authorization_endpoint: "https://moqi.mooblek.com/authorize",
-            token_endpoint: "https://moqi.mooblek.com/token",
-            jwks_uri: "https://moqi.mooblek.com/.well-known/jwks.json",
-            userinfo_endpoint: "https://moqi.mooblek.com/userinfo",
+            issuer: "https://auth.cone.com",
+            authorization_endpoint: "https://auth.cone.com/authorize",
+            token_endpoint: "https://auth.cone.com/token",
+            jwks_uri: "https://auth.cone.com/.well-known/jwks.json",
+            userinfo_endpoint: "https://auth.cone.com/userinfo",
         });
     });
 });

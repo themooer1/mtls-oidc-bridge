@@ -2,12 +2,17 @@
   "name": "openid-tls-connector",
   "module": "src/index.ts",
   "scripts": {
-    "dev": "bun --watch src/main.ts"
+    "dev": "bun --watch src/main.ts",
+    "test": "bun test",
+    "test:ldap": "node --import tsx --test src/users/ldap.integration.ts",
+    "test:all": "bun test && node --import tsx --test src/users/ldap.integration.ts"
   },
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "testcontainers": "^12.0.4",
+    "tsx": "^4.23.0"
   },
   "peerDependencies": {
     "typescript": "^5"

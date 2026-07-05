@@ -1,6 +1,6 @@
 import type { UserBackend, UserClaims } from "./users";
 
-import * as ldap from 'ldapjs'
+import ldapjs, { type Client, type SearchEntryObject, type SearchOptions } from 'ldapjs'
 import { log } from '../logger';
 
 // ---------------------------------------------------------------------------
@@ -13,6 +13,9 @@ export interface LdapBackendConfig {
     ldapBindPassword: string;
 }
 
+const isNoSuchObjectError = (err: unknown): boolean =>
+    err instanceof Error && err.name === "NoSuchObjectError";
+
 /**
  * Stub LDAP user backend.
  * Replace the body of `getClaims` with a real ldap:// search.
@@ -21,8 +24,8 @@ export class LdapUserBackend implements UserBackend {
 
     public static async createInstance(config: LdapBackendConfig): Promise<LdapUserBackend> {
         log.debug("Creating LDAP user backend", config.ldapUrl);
-        const client = new Promise<ldap.Client>((resolve, reject) => {
-            let client = ldap.createClient({
+        const client = new Promise<Client>((resolve, reject) => {
+            let client = ldapjs.createClient({
                 url: config.ldapUrl,
                 reconnect: true
             });
@@ -42,9 +45,9 @@ export class LdapUserBackend implements UserBackend {
         return new LdapUserBackend(await client);
     }
 
-    private constructor(private readonly client: ldap.Client) {}
+    private constructor(private readonly client: Client) {}
 
-    mapClaims(entry: ldap.SearchEntryObject): UserClaims | null {
+    mapClaims(entry: SearchEntryObject): UserClaims | null {
         if (!entry || !entry.attributes) {
             log.debug("LDAP entry has no attributes");
             return null;
@@ -101,8 +104,8 @@ export class LdapUserBackend implements UserBackend {
     async getClaims(identifier: string): Promise<UserClaims | null> {
         log.debug("Looking up user in LDAP backend", identifier);
 
-        const entry = new Promise<ldap.SearchEntryObject | null>((resolve, reject) => {
-            const opts: ldap.SearchOptions = {
+        const entry = new Promise<SearchEntryObject | null>((resolve, reject) => {
+            const opts: SearchOptions = {
                 scope: 'base',
                 attributes: ['uid', 'sAMAccountName', 'displayName', 'cn', 'mail', 'userPrincipalName']
             };
@@ -114,9 +117,14 @@ export class LdapUserBackend implements UserBackend {
                     return;
                 }
 
-                let entry: ldap.SearchEntryObject | null = null;
+                let entry: SearchEntryObject | null = null;
                 res.on('searchEntry', e => entry = e.pojo);
                 res.on('error', err => {
+                    if (isNoSuchObjectError(err)) {
+                        resolve(null);
+                        return;
+                    }
+
                     log.error("LDAP user lookup stream failed", err);
                     reject(err);
                 });
