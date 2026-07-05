@@ -41,11 +41,11 @@ export function TrustedHeaderProvider
     init(routes, ctx) {
       routes.get("/authorize", async (c) => {
         // The header from the proxy tells us who is trying to login
-        const subject = c.req.header(header) || "someone";
+        const subject = c.req.header(header);
         log.debug("TrustedHeaderProvider subject", subject);
 
         // If it's not there, redirect to the RP with an error.
-        if (subject === undefined) {
+        if (subject === undefined || subject === "") {
           throw new MissingAuthHeaderError();
         }
 
