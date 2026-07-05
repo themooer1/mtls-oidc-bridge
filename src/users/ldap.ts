@@ -11,7 +11,6 @@ export interface LdapBackendConfig {
     ldapUrl: string;
     ldapBindDn: string;
     ldapBindPassword: string;
-    ldapBaseDn: string;
 }
 
 /**
@@ -40,11 +39,10 @@ export class LdapUserBackend implements UserBackend {
             })
         })
 
-        // TODO: get 'uid' subAttribute from config
-        return new LdapUserBackend(await client, config.ldapBaseDn, 'uid');
+        return new LdapUserBackend(await client);
     }
 
-    private constructor(private readonly client: ldap.Client, _userDN: string, private readonly subAttribute: string) {}
+    private constructor(private readonly client: ldap.Client) {}
 
     mapClaims(entry: ldap.SearchEntryObject): UserClaims | null {
         if (!entry || !entry.attributes) {
@@ -61,24 +59,13 @@ export class LdapUserBackend implements UserBackend {
             return attr.values[0];
         };
 
-        // 1. Determine the 'sub' claim based on your class configuration.
-        // If 'subAttribute' is set to 'dn' or 'objectName', use the entry's full DN.
-        // Otherwise, look it up dynamically from the attributes array (e.g., 'uid' or 'objectGUID').
-        let subClaim: string | undefined;
-        
-        if (this.subAttribute.toLowerCase() === 'dn' || this.subAttribute.toLowerCase() === 'objectname') {
-            subClaim = entry.objectName;
-        } else {
-            subClaim = getSingleValue(this.subAttribute);
-        }
+        const subClaim = entry.objectName;
 
         // If we can't establish a 'sub' claim, the OIDC token profile is invalid.
         if (!subClaim) {
-            log.error("LDAP entry is missing required sub claim", this.subAttribute);
+            log.error("LDAP entry is missing required DN for sub claim");
             return null;
         }
-
-        // 2. Map standard LDAP keys to standard OIDC claims
 
         // Base claims object which might be extended with other claims.
         let claims: UserClaims = {
@@ -93,6 +80,10 @@ export class LdapUserBackend implements UserBackend {
         const email = getSingleValue('mail');
         if (email)
             claims = {...claims, email};
+
+        const upn = getSingleValue('userPrincipalName');
+        if (!email && upn)
+            claims = {...claims, email: upn};
             
         // Typically mapped to 'displayName' or 'cn'
         const name = getSingleValue('displayName') || getSingleValue('cn');
@@ -113,8 +104,7 @@ export class LdapUserBackend implements UserBackend {
         const entry = new Promise<ldap.SearchEntryObject | null>((resolve, reject) => {
             const opts: ldap.SearchOptions = {
                 scope: 'base',
-                // TODO: get these from config
-                attributes: [this.subAttribute, 'displayName', 'mail']
+                attributes: ['uid', 'sAMAccountName', 'displayName', 'cn', 'mail', 'userPrincipalName']
             };
 
             this.client.search(identifier, opts, (err, res) => {

@@ -14,8 +14,6 @@ export const UserBackendConfigSchema = v.variant('userBackend', [
         ldapBindDn: v.string(),
         /** Bind password for the search user. */
         ldapBindPassword: v.string(),
-        /** Base DN for user searches. */
-        ldapBaseDn: v.string(),
     }),
 ]);
 

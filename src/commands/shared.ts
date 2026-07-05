@@ -20,7 +20,6 @@ export const userBackendOptions = () => [
     new Option('--ldap-url <url>',          '[ldap backend] ldap:// URL').env('LDAP_URL'),
     new Option('--ldap-bind-dn <dn>',       '[ldap backend] Bind DN').env('LDAP_BIND_DN'),
     new Option('--ldap-bind-password <pw>', '[ldap backend] Bind password').env('LDAP_BIND_PASSWORD'),
-    new Option('--ldap-base-dn <dn>',       '[ldap backend] Base DN for searches').env('LDAP_BASE_DN'),
 ];
 
 /**
