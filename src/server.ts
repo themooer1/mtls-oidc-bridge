@@ -127,7 +127,8 @@ export function createApp(providerConfig: ProviderConfig, userBackend: UserBacke
 
             return ctx.subject(
                 "user",
-                claims
+                claims,
+                { subject: claims.sub },
                 
             )
         },
