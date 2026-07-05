@@ -1,7 +1,10 @@
 import { issuer } from "@openauthjs/openauth";
+import { signingKeys } from "@openauthjs/openauth/keys";
 import { MemoryStorage } from "@openauthjs/openauth/storage/memory";
+import { Storage, type StorageAdapter } from "@openauthjs/openauth/storage/storage";
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { SignJWT, type JWTPayload } from "jose";
 import { subjects } from "./subjects";
 import { TrustedHeaderProvider } from "./provider/provider";
 import { MissingUserError, type UserBackend } from "./users/users";
@@ -38,7 +41,76 @@ const parseBasicClientAuth = (authorization: string | undefined): { id: string; 
 const invalidClientResponse = () =>
     Response.json({ error: "invalid_client" }, { status: 401 });
 
-const tokenRequest = (authApp: { fetch: (request: Request) => Response | Promise<Response> }, clientBackend: ClientBackend) =>
+type AuthorizationCodePayload = {
+    type: string;
+    properties: Record<string, unknown>;
+    subject: string;
+    redirectURI: string;
+    clientID: string;
+    pkce?: unknown;
+    ttl: {
+        access: number;
+        refresh: number;
+    };
+};
+
+const idTokenReservedClaims = new Set([
+    "iss",
+    "sub",
+    "aud",
+    "exp",
+    "nbf",
+    "iat",
+    "jti",
+    "auth_time",
+    "nonce",
+    "acr",
+    "amr",
+    "azp",
+    "at_hash",
+    "c_hash",
+]);
+
+const additionalIdTokenClaims = (properties: Record<string, unknown>): JWTPayload => {
+    const claims: JWTPayload = {};
+    for (const [key, value] of Object.entries(properties)) {
+        if (idTokenReservedClaims.has(key))
+            continue;
+
+        if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+            claims[key] = value;
+    }
+    return claims;
+};
+
+const createIdToken = async (storage: StorageAdapter, requestUrl: string, codePayload: AuthorizationCodePayload) => {
+    const keys = await signingKeys(storage);
+    const key = keys.find((candidate) => !candidate.expired) ?? keys[0];
+    if (!key)
+        throw new Error("No OpenAuth signing key available");
+
+    const now = Math.floor(Date.now() / 1000);
+    const subject = typeof codePayload.properties["sub"] === "string"
+        ? codePayload.properties["sub"]
+        : codePayload.subject;
+
+    return await new SignJWT({
+        ...additionalIdTokenClaims(codePayload.properties),
+        iss: new URL(requestUrl).origin,
+        sub: subject,
+        aud: codePayload.clientID,
+        iat: now,
+        exp: now + codePayload.ttl.access,
+    })
+        .setProtectedHeader({
+            alg: key.alg,
+            kid: key.id,
+            typ: "JWT",
+        })
+        .sign(key.private);
+};
+
+const tokenRequest = (authApp: { fetch: (request: Request) => Response | Promise<Response> }, clientBackend: ClientBackend, storage: StorageAdapter) =>
     async (c: Context) => {
         const body = await c.req.text();
         const form = new URLSearchParams(body);
@@ -70,6 +142,10 @@ const tokenRequest = (authApp: { fetch: (request: Request) => Response | Promise
             }
         }
 
+        const codePayload = form.get("grant_type") === "authorization_code" && form.get("code")
+            ? await Storage.get<AuthorizationCodePayload>(storage, ["oauth:code", form.get("code") ?? ""])
+            : null;
+
         const headers = new Headers(c.req.raw.headers);
         headers.delete("authorization");
         headers.delete("content-length");
@@ -88,6 +164,8 @@ const tokenRequest = (authApp: { fetch: (request: Request) => Response | Promise
         const payload = await response.json() as Record<string, unknown>;
         if (typeof payload["access_token"] === "string" && !payload["token_type"])
             payload["token_type"] = "Bearer";
+        if (typeof payload["access_token"] === "string" && codePayload)
+            payload["id_token"] = await createIdToken(storage, c.req.url, codePayload);
 
         const responseHeaders = new Headers(response.headers);
         responseHeaders.delete("content-length");
@@ -135,7 +213,7 @@ export function createApp(providerConfig: ProviderConfig, userBackend: UserBacke
         allow: makeClientRedirectVerifier(clientBackend),
     });
 
-    app.post("/token", tokenRequest(authApp, clientBackend));
+    app.post("/token", tokenRequest(authApp, clientBackend, storage));
     app.route("/", authApp);
     return app;
 }

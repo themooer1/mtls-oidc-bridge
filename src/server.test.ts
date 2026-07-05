@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createLocalJWKSet, jwtVerify, type JSONWebKeySet } from "jose";
 
 import type { ClientsBackend, Client } from "./clients/client";
 import { createApp } from "./server";
@@ -132,6 +133,45 @@ describe("createApp", () => {
         });
         expect(typeof payload["access_token"]).toBe("string");
         expect(typeof payload["refresh_token"]).toBe("string");
+        expect(typeof payload["id_token"]).toBe("string");
+
+        const jwksResponse = await app.request("http://auth.example/.well-known/jwks.json");
+        expect(jwksResponse.status).toBe(200);
+
+        const { payload: idTokenClaims } = await jwtVerify(
+            payload["id_token"] as string,
+            createLocalJWKSet(await jwksResponse.json() as JSONWebKeySet),
+            {
+                issuer: "http://auth.example",
+                audience: client.id,
+            },
+        );
+        expect(idTokenClaims).toMatchObject({
+            iss: "http://auth.example",
+            sub: "icecream",
+            aud: client.id,
+            name: "Ice Cream",
+            email: "icecream@cone.example",
+        });
+        expect(typeof idTokenClaims["iat"]).toBe("number");
+        expect(typeof idTokenClaims["exp"]).toBe("number");
+
+        const refreshed = await app.request("http://auth.example/token", {
+            method: "POST",
+            headers: {
+                authorization: basic(client.id, secret),
+                "content-type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+                grant_type: "refresh_token",
+                refresh_token: payload["refresh_token"] as string,
+            }),
+        });
+
+        expect(refreshed.status).toBe(200);
+        const refreshedPayload = await refreshed.json() as Record<string, unknown>;
+        expect(typeof refreshedPayload["access_token"]).toBe("string");
+        expect(refreshedPayload["id_token"]).toBeUndefined();
     });
 
     test("rejects malformed client_secret_basic credentials", async () => {
