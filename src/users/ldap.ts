@@ -1,6 +1,7 @@
 import type { UserBackend, UserClaims } from "./users";
 
 import * as ldap from 'ldapjs'
+import { log } from '../logger';
 
 // ---------------------------------------------------------------------------
 // LDAP backend
@@ -20,14 +21,21 @@ export interface LdapBackendConfig {
 export class LdapUserBackend implements UserBackend {
 
     public static async createInstance(config: LdapBackendConfig): Promise<LdapUserBackend> {
+        log.debug("Creating LDAP user backend", config.ldapUrl);
         const client = new Promise<ldap.Client>((resolve, reject) => {
             let client = ldap.createClient({
                 url: config.ldapUrl,
                 reconnect: true
             });
 
-            client.bind(config.ldapBindDn, config.ldapBindPassword, (err, res) => {
-                if (err) reject(err);
+            client.bind(config.ldapBindDn, config.ldapBindPassword, (err, _res) => {
+                if (err) {
+                    log.error("Failed to bind LDAP user backend", err);
+                    reject(err);
+                    return;
+                }
+
+                log.debug("Bound LDAP user backend", config.ldapBindDn);
                 resolve(client);
             })
         })
@@ -36,10 +44,11 @@ export class LdapUserBackend implements UserBackend {
         return new LdapUserBackend(await client, config.ldapBaseDn, 'uid');
     }
 
-    private constructor(private readonly client: ldap.Client, private readonly userDN: string, private readonly subAttribute: string) {}
+    private constructor(private readonly client: ldap.Client, _userDN: string, private readonly subAttribute: string) {}
 
     mapClaims(entry: ldap.SearchEntryObject): UserClaims | null {
         if (!entry || !entry.attributes) {
+            log.debug("LDAP entry has no attributes");
             return null;
         }
 
@@ -65,6 +74,7 @@ export class LdapUserBackend implements UserBackend {
 
         // If we can't establish a 'sub' claim, the OIDC token profile is invalid.
         if (!subClaim) {
+            log.error("LDAP entry is missing required sub claim", this.subAttribute);
             return null;
         }
 
@@ -98,6 +108,8 @@ export class LdapUserBackend implements UserBackend {
      * @returns UserClaims or null if the user wasn't found
      */
     async getClaims(identifier: string): Promise<UserClaims | null> {
+        log.debug("Looking up user in LDAP backend", identifier);
+
         const entry = new Promise<ldap.SearchEntryObject | null>((resolve, reject) => {
             const opts: ldap.SearchOptions = {
                 scope: 'base',
@@ -106,15 +118,35 @@ export class LdapUserBackend implements UserBackend {
             };
 
             this.client.search(identifier, opts, (err, res) => {
-                if (err) reject(err);
+                if (err) {
+                    log.error("LDAP user lookup failed", err);
+                    reject(err);
+                    return;
+                }
 
                 let entry: ldap.SearchEntryObject | null = null;
                 res.on('searchEntry', e => entry = e.pojo);
-                res.on('error', err => reject(err));
+                res.on('error', err => {
+                    log.error("LDAP user lookup stream failed", err);
+                    reject(err);
+                });
                 res.on('end', () => resolve(entry))
             })
         })
 
-        return entry.then(e => e ? this.mapClaims(e) : null);
+        const result = await entry;
+        if (result === null) {
+            log.debug("User not found in LDAP backend", identifier);
+            return null;
+        }
+
+        const claims = this.mapClaims(result);
+        if (claims === null) {
+            log.debug("LDAP user entry could not be mapped to claims", identifier);
+        } else {
+            log.debug("Found user in LDAP backend", identifier);
+        }
+
+        return claims;
     }
 }

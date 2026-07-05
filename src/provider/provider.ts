@@ -6,6 +6,7 @@
 import type { Provider } from "@openauthjs/openauth/provider/provider";
 import { OauthError } from "@openauthjs/openauth/error";
 import type { HeaderParser } from "./header/header_parser";
+import { log } from "../logger";
 
 class MissingAuthHeaderError extends OauthError {
   constructor() {
@@ -41,16 +42,20 @@ export function TrustedHeaderProvider
       routes.get("/authorize", async (c) => {
         // The header from the proxy tells us who is trying to login
         const subject = c.req.header(header) || "someone";
+        log.debug("TrustedHeaderProvider subject", subject);
 
         // If it's not there, redirect to the RP with an error.
         if (subject === undefined) {
           throw new MissingAuthHeaderError();
         }
 
+        const identifier = getUserIdentifier(subject);
+        log.debug("TrustedHeaderProvider user identifier", identifier);
+
         // Log in the subject identified in the proxy header
         return ctx.forward(
             c,
-            await ctx.success(c, {claims: {identifier: getUserIdentifier(subject)}}))
+            await ctx.success(c, {claims: {identifier}}))
       })
     },
   }
