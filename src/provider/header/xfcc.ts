@@ -1,6 +1,6 @@
 import { MalformedHeaderError, type HeaderParser } from "./header_parser";
 
-const SubjectRegex = /Subject="((?:\\.|[^\\"])+)"/g;
+const SubjectRegex = /Subject="((?:\\.|[^\\"])+)"/;
 
 /**
  * HeaderParser where the header is in Envoy Proxy's X-Forwarded-Client-Cert format.
@@ -21,8 +21,8 @@ const SubjectRegex = /Subject="((?:\\.|[^\\"])+)"/g;
 export const XFCCHeaderParser: HeaderParser = h => {
     const match = SubjectRegex.exec(h)
 
-    if (match)
-        return match[0];
+    if (match?.[1])
+        return match[1];
 
     throw new MalformedHeaderError();
 }
