@@ -19,10 +19,7 @@ type FileUserDB = v.InferOutput<typeof FileUserDBSchema>;
 type FileUserConfigFile = ConfigFile<FileUserDB>;
 
 /**
- * Simple file-based {@link UserBackend} that stores users as a JSON array of UserClaims.
- *
- * The file is read fresh on every read operation so external edits are always
- * picked up. Writes are atomic (full file rewrite).
+ * Simple file-based {@link UserBackend} that stores users in a JSON object keyed by identifier.
  */
 export class FileUserBackend implements UserBackend {
     static async createInstance(
@@ -37,6 +34,7 @@ export class FileUserBackend implements UserBackend {
                 config.userFilePath,
                 create,
             );
+            v.parse(FileUserDBSchema, configFile.data);
         } catch (err) {
             log.error("Failed to open file user backend", err);
             throw err;
