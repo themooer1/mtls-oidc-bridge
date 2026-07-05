@@ -1,5 +1,6 @@
 import { issuer } from "@openauthjs/openauth";
 import { MemoryStorage } from "@openauthjs/openauth/storage/memory";
+import { Hono } from "hono";
 import { subjects } from "./subjects";
 import { TrustedHeaderProvider } from "./provider/provider";
 import { MissingUserError, type UserBackend } from "./users/users";
@@ -7,6 +8,7 @@ import { makeClientRedirectVerifier } from "./clients/verifier";
 import type { ClientsBackend as ClientBackend } from "./clients/client";
 import { createHeaderParser } from "./provider/header/factory";
 import type { ProviderConfig } from "./provider/config";
+import { registerUserInfoRoutes } from "./userinfo";
 
 
 
@@ -17,11 +19,16 @@ import type { ProviderConfig } from "./provider/config";
  * particular config shape (env vars, CLI options, etc.).
  */
 export function createApp(providerConfig: ProviderConfig, userBackend: UserBackend, clientBackend: ClientBackend) {
-    return issuer({
+    const storage = MemoryStorage();
+    const app = new Hono();
+
+    registerUserInfoRoutes(app, storage);
+
+    const authApp = issuer({
         providers: {
             proxy_header: TrustedHeaderProvider({ header: providerConfig.userCertificateHeader, getUserIdentifier: createHeaderParser(providerConfig)}),
         },
-        storage: MemoryStorage(),
+        storage,
         subjects,
         success: async (ctx, value) => {
             const claims = await userBackend.getClaims(value.claims.identifier);
@@ -39,4 +46,7 @@ export function createApp(providerConfig: ProviderConfig, userBackend: UserBacke
         },
         allow: makeClientRedirectVerifier(clientBackend),
     });
+
+    app.route("/", authApp);
+    return app;
 }
