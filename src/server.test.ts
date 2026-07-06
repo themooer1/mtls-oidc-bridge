@@ -4,11 +4,12 @@ import { Buffer } from "node:buffer";
 
 import type { ClientsBackend, Client } from "./clients/client";
 import { createApp } from "./server";
+import type { EndpointMetadataConfig } from "./userinfo";
 import type { UserBackend, UserClaims } from "./users/users";
 
 const redirectUri = "https://rp.example/callback";
 
-const createTestApp = async () => {
+const createTestApp = async (endpointConfig: EndpointMetadataConfig = {}) => {
     const secret = "s3cr3t";
     const client: Client = {
         id: "oidcc-client",
@@ -43,6 +44,7 @@ const createTestApp = async () => {
             },
             users,
             clients,
+            endpointConfig,
         ),
         client,
         secret,
@@ -193,5 +195,76 @@ describe("createApp", () => {
 
         expect(response.status).toBe(401);
         expect(await response.json()).toEqual({ error: "invalid_client" });
+    });
+
+    test("uses configured issuer with split public and backchannel endpoints", async () => {
+        const { app, client, secret } = await createTestApp({
+            issuerUrl: "https://issuer.op.example",
+            publicBaseUrl: "https://public.op.example",
+            backchannelBaseUrl: "https://backchannel.op.example",
+        });
+
+        const discoveryResponse = await app.request("https://backchannel.op.example/.well-known/openid-configuration");
+        expect(discoveryResponse.status).toBe(200);
+        expect(await discoveryResponse.json()).toMatchObject({
+            issuer: "https://issuer.op.example",
+            authorization_endpoint: "https://public.op.example/authorize",
+            token_endpoint: "https://backchannel.op.example/token",
+            userinfo_endpoint: "https://backchannel.op.example/userinfo",
+            jwks_uri: "https://backchannel.op.example/.well-known/jwks.json",
+        });
+
+        const code = await authorize(app);
+        const tokenResponse = await app.request("https://backchannel.op.example/token", {
+            method: "POST",
+            headers: {
+                authorization: basic(client.id, secret),
+                "content-type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+                grant_type: "authorization_code",
+                code,
+                redirect_uri: redirectUri,
+            }),
+        });
+
+        expect(tokenResponse.status).toBe(200);
+        const tokens = await tokenResponse.json() as Record<string, unknown>;
+        expect(typeof tokens["access_token"]).toBe("string");
+        expect(typeof tokens["id_token"]).toBe("string");
+
+        const jwksResponse = await app.request("https://backchannel.op.example/.well-known/jwks.json");
+        expect(jwksResponse.status).toBe(200);
+        const jwks = createLocalJWKSet(await jwksResponse.json() as JSONWebKeySet);
+
+        const { payload: idTokenClaims } = await jwtVerify(
+            tokens["id_token"] as string,
+            jwks,
+            {
+                issuer: "https://issuer.op.example",
+                audience: client.id,
+            },
+        );
+        expect(idTokenClaims.iss).toBe("https://issuer.op.example");
+
+        const { payload: accessTokenClaims } = await jwtVerify(
+            tokens["access_token"] as string,
+            jwks,
+            {
+                issuer: "https://issuer.op.example",
+                audience: client.id,
+            },
+        );
+        expect(accessTokenClaims.iss).toBe("https://issuer.op.example");
+
+        const userInfoResponse = await app.request("https://backchannel.op.example/userinfo", {
+            headers: { authorization: `Bearer ${tokens["access_token"]}` },
+        });
+        expect(userInfoResponse.status).toBe(200);
+        expect(await userInfoResponse.json()).toMatchObject({
+            sub: "icecream",
+            name: "Ice Cream",
+            email: "icecream@cone.example",
+        });
     });
 });

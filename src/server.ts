@@ -13,7 +13,11 @@ import { makeClientRedirectVerifier } from "./clients/verifier";
 import type { ClientsBackend as ClientBackend } from "./clients/client";
 import { createHeaderParser } from "./provider/header/factory";
 import type { ProviderConfig } from "./provider/config";
-import { registerUserInfoRoutes } from "./userinfo";
+import {
+    type EndpointMetadataConfig,
+    registerUserInfoRoutes,
+    resolveEndpointMetadata,
+} from "./userinfo";
 
 const parseBasicClientAuth = (authorization: string | undefined): { id: string; secret: string } | null => {
     const match = authorization?.match(/^Basic (.+)$/i);
@@ -84,7 +88,11 @@ const additionalIdTokenClaims = (properties: Record<string, unknown>): JWTPayloa
     return claims;
 };
 
-const createIdToken = async (storage: StorageAdapter, requestUrl: string, codePayload: AuthorizationCodePayload) => {
+const createIdToken = async (
+    storage: StorageAdapter,
+    issuerUrl: string,
+    codePayload: AuthorizationCodePayload,
+) => {
     const keys = await signingKeys(storage);
     const key = keys.find((candidate) => !candidate.expired) ?? keys[0];
     if (!key)
@@ -97,7 +105,7 @@ const createIdToken = async (storage: StorageAdapter, requestUrl: string, codePa
 
     return await new SignJWT({
         ...additionalIdTokenClaims(codePayload.properties),
-        iss: new URL(requestUrl).origin,
+        iss: issuerUrl,
         sub: subject,
         aud: codePayload.clientID,
         iat: now,
@@ -111,8 +119,25 @@ const createIdToken = async (storage: StorageAdapter, requestUrl: string, codePa
         .sign(key.private);
 };
 
-const tokenRequest = (authApp: { fetch: (request: Request) => Response | Promise<Response> }, clientBackend: ClientBackend, storage: StorageAdapter) =>
+const requestUrlWithOrigin = (requestUrl: string, origin: string): string => {
+    const url = new URL(requestUrl);
+    const originUrl = new URL(origin);
+    url.protocol = originUrl.protocol;
+    url.hostname = originUrl.hostname;
+    url.port = originUrl.port;
+    url.username = "";
+    url.password = "";
+    return url.toString();
+};
+
+const tokenRequest = (
+    authApp: { fetch: (request: Request) => Response | Promise<Response> },
+    clientBackend: ClientBackend,
+    storage: StorageAdapter,
+    endpointConfig: EndpointMetadataConfig,
+) =>
     async (c: Context) => {
+        const endpoints = resolveEndpointMetadata(c.req.url, endpointConfig);
         const body = await c.req.text();
         const form = new URLSearchParams(body);
         const authorization = c.req.header("authorization");
@@ -152,7 +177,7 @@ const tokenRequest = (authApp: { fetch: (request: Request) => Response | Promise
         headers.delete("content-length");
         headers.set("content-type", "application/x-www-form-urlencoded");
 
-        const response = await authApp.fetch(new Request(c.req.url, {
+        const response = await authApp.fetch(new Request(requestUrlWithOrigin(c.req.url, endpoints.issuer), {
             method: "POST",
             headers,
             body: form.toString(),
@@ -166,7 +191,7 @@ const tokenRequest = (authApp: { fetch: (request: Request) => Response | Promise
         if (typeof payload["access_token"] === "string" && !payload["token_type"])
             payload["token_type"] = "Bearer";
         if (typeof payload["access_token"] === "string" && codePayload)
-            payload["id_token"] = await createIdToken(storage, c.req.url, codePayload);
+            payload["id_token"] = await createIdToken(storage, endpoints.issuer, codePayload);
 
         const responseHeaders = new Headers(response.headers);
         responseHeaders.delete("content-length");
@@ -184,11 +209,16 @@ const tokenRequest = (authApp: { fetch: (request: Request) => Response | Promise
  * Accepts only what it actually needs so callers aren't coupled to a
  * particular config shape (env vars, CLI options, etc.).
  */
-export function createApp(providerConfig: ProviderConfig, userBackend: UserBackend, clientBackend: ClientBackend) {
+export function createApp(
+    providerConfig: ProviderConfig,
+    userBackend: UserBackend,
+    clientBackend: ClientBackend,
+    endpointConfig: EndpointMetadataConfig = {},
+) {
     const storage = MemoryStorage();
     const app = new Hono();
 
-    registerUserInfoRoutes(app, storage);
+    registerUserInfoRoutes(app, storage, endpointConfig);
 
     const authApp = issuer({
         providers: {
@@ -214,7 +244,7 @@ export function createApp(providerConfig: ProviderConfig, userBackend: UserBacke
         allow: makeClientRedirectVerifier(clientBackend),
     });
 
-    app.post("/token", tokenRequest(authApp, clientBackend, storage));
+    app.post("/token", tokenRequest(authApp, clientBackend, storage, endpointConfig));
     app.route("/", authApp);
     return app;
 }

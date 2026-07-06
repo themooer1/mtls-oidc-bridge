@@ -14,7 +14,12 @@ import { log } from '../logger';
 // ---------------------------------------------------------------------------
 
 export const RunConfigSchema = v.intersect([
-    v.object({ port: v.pipe(v.string(), v.transform(Number)) }),
+    v.object({
+        port: v.pipe(v.string(), v.transform(Number)),
+        issuerUrl: v.optional(v.string()),
+        publicBaseUrl: v.optional(v.string()),
+        backchannelBaseUrl: v.optional(v.string()),
+    }),
     ProviderConfigSchema,
     UserBackendConfigSchema,
     ClientsBackendConfigSchema,
@@ -30,7 +35,11 @@ export async function run(config: RunConfig): Promise<void> {
     const clientBackend = await createClientBackend(config);
     const userBackend = await createUserBackend(config);
 
-    const app = createApp(config, userBackend, clientBackend);
+    const app = createApp(config, userBackend, clientBackend, {
+        issuerUrl: config.issuerUrl,
+        publicBaseUrl: config.publicBaseUrl,
+        backchannelBaseUrl: config.backchannelBaseUrl,
+    });
 
     log.info(`Starting OpenAuth server on port ${config.port}`);
     Bun.serve({ port: config.port, fetch: app.fetch });
@@ -43,6 +52,18 @@ export async function run(config: RunConfig): Promise<void> {
 export const runCmd = new Command('run')
     .description('Start the OpenID Provider HTTP server')
     .addOption(new Option('-p, --port <number>', 'Port to listen on').env('PORT').default('3000'))
+    .addOption(new Option(
+        '--issuer-url <url>',
+        'External OIDC issuer URL used for issuer metadata and token issuer claims',
+    ).env('OIDC_ISSUER_URL'))
+    .addOption(new Option(
+        '--public-base-url <url>',
+        'External public base URL for browser-facing OIDC endpoints such as /authorize',
+    ).env('OIDC_PUBLIC_BASE_URL'))
+    .addOption(new Option(
+        '--backchannel-base-url <url>',
+        'External backchannel base URL for discovery, /token, /userinfo, and JWKS',
+    ).env('OIDC_BACKCHANNEL_BASE_URL'))
     .addOption(new Option(
         '--user-certificate-header <header>',
         'Trusted HTTP header injected by the reverse proxy',

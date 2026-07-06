@@ -10,10 +10,44 @@ type AccessTokenPayload = {
     properties?: unknown;
 };
 
+export type EndpointMetadataConfig = {
+    issuerUrl?: string;
+    publicBaseUrl?: string;
+    backchannelBaseUrl?: string;
+};
+
+type ResolvedEndpointMetadata = {
+    issuer: string;
+    publicBase: string;
+    backchannelBase: string;
+};
+
 const isRecord = (value: unknown): value is Record<string, string | number | boolean> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
 
 const issuerFor = (url: string): string => new URL(url).origin;
+
+const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, "");
+
+const normalizeEndpointConfig = (config: EndpointMetadataConfig = {}): EndpointMetadataConfig => ({
+    issuerUrl: config.issuerUrl ? trimTrailingSlashes(config.issuerUrl) : undefined,
+    publicBaseUrl: config.publicBaseUrl ? trimTrailingSlashes(config.publicBaseUrl) : undefined,
+    backchannelBaseUrl: config.backchannelBaseUrl ? trimTrailingSlashes(config.backchannelBaseUrl) : undefined,
+});
+
+export const resolveEndpointMetadata = (
+    requestUrl: string,
+    config: EndpointMetadataConfig = {},
+): ResolvedEndpointMetadata => {
+    const normalized = normalizeEndpointConfig(config);
+    const issuer = normalized.issuerUrl ?? issuerFor(requestUrl);
+
+    return {
+        issuer,
+        publicBase: normalized.publicBaseUrl ?? issuer,
+        backchannelBase: normalized.backchannelBaseUrl ?? issuer,
+    };
+};
 
 const addDiscoveryCorsHeaders = (headers: Headers): void => {
     headers.set("Access-Control-Allow-Origin", "*");
@@ -29,15 +63,19 @@ const addDiscoveryCorsHeaders = (headers: Headers): void => {
  * OpenAuth's own storage-backed signing keys, then returns those embedded claims
  * as the UserInfo response for clients that expect a standard OIDC endpoint.
  */
-export const registerUserInfoRoutes = (app: Hono, storage: StorageAdapter): void => {
+export const registerUserInfoRoutes = (
+    app: Hono,
+    storage: StorageAdapter,
+    endpointConfig: EndpointMetadataConfig = {},
+): void => {
     const discovery = (requestUrl: string) => {
-        const issuer = issuerFor(requestUrl);
+        const endpoints = resolveEndpointMetadata(requestUrl, endpointConfig);
         return {
-            issuer,
-            authorization_endpoint: `${issuer}/authorize`,
-            token_endpoint: `${issuer}/token`,
-            jwks_uri: `${issuer}/.well-known/jwks.json`,
-            userinfo_endpoint: `${issuer}/userinfo`,
+            issuer: endpoints.issuer,
+            authorization_endpoint: `${endpoints.publicBase}/authorize`,
+            token_endpoint: `${endpoints.backchannelBase}/token`,
+            jwks_uri: `${endpoints.backchannelBase}/.well-known/jwks.json`,
+            userinfo_endpoint: `${endpoints.backchannelBase}/userinfo`,
             response_types_supported: ["code", "token"],
             grant_types_supported: ["authorization_code", "refresh_token"],
             scopes_supported: ["openid", "profile", "email"],
@@ -73,7 +111,7 @@ export const registerUserInfoRoutes = (app: Hono, storage: StorageAdapter): void
             ...await legacySigningKeys(storage),
         ];
 
-        const { payload } = await jwtVerify<AccessTokenPayload>(
+        const verified = await jwtVerify<AccessTokenPayload>(
             token,
             async (protectedHeader) => {
                 const key = keys.find((candidate) => candidate.id === protectedHeader.kid);
@@ -82,8 +120,12 @@ export const registerUserInfoRoutes = (app: Hono, storage: StorageAdapter): void
 
                 return key.public;
             },
-            { issuer: issuerFor(c.req.url) },
-        );
+            { issuer: resolveEndpointMetadata(c.req.url, endpointConfig).issuer },
+        ).catch(() => null);
+        if (!verified)
+            return c.json({ error: "invalid_token" }, 401);
+
+        const { payload } = verified;
 
         if (payload.mode !== "access" || payload.type !== "user" || !isRecord(payload.properties))
             return c.json({ error: "invalid_token" }, 401);

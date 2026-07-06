@@ -36,7 +36,7 @@ describe("userinfo routes", () => {
                 sub: "icecream",
                 preferred_username: "icecream",
                 name: "Ice Cream",
-                email: "icecream@cone.com",
+                email: "icecream@example.com",
             },
         });
 
@@ -49,7 +49,7 @@ describe("userinfo routes", () => {
             sub: "icecream",
             preferred_username: "icecream",
             name: "Ice Cream",
-            email: "icecream@cone.com",
+            email: "icecream@example.com",
         });
     });
 
@@ -133,11 +133,11 @@ describe("userinfo routes", () => {
         registerUserInfoRoutes(app, storage);
 
         const expected = {
-            issuer: "https://auth.cone.com",
-            authorization_endpoint: "https://auth.cone.com/authorize",
-            token_endpoint: "https://auth.cone.com/token",
-            jwks_uri: "https://auth.cone.com/.well-known/jwks.json",
-            userinfo_endpoint: "https://auth.cone.com/userinfo",
+            issuer: "https://op.example",
+            authorization_endpoint: "https://op.example/authorize",
+            token_endpoint: "https://op.example/token",
+            jwks_uri: "https://op.example/.well-known/jwks.json",
+            userinfo_endpoint: "https://op.example/userinfo",
             response_types_supported: ["code", "token"],
             grant_types_supported: ["authorization_code", "refresh_token"],
             scopes_supported: ["openid", "profile", "email"],
@@ -147,14 +147,82 @@ describe("userinfo routes", () => {
             claims_supported: ["sub", "name", "email", "preferred_username"],
         };
 
-        const oidcResponse = await app.request("https://auth.cone.com/.well-known/openid-configuration");
+        const oidcResponse = await app.request("https://op.example/.well-known/openid-configuration");
 
         expect(oidcResponse.status).toBe(200);
         expect(await oidcResponse.json()).toEqual(expected);
 
-        const oauthResponse = await app.request("https://auth.cone.com/.well-known/oauth-authorization-server");
+        const oauthResponse = await app.request("https://op.example/.well-known/oauth-authorization-server");
 
         expect(oauthResponse.status).toBe(200);
         expect(await oauthResponse.json()).toEqual(expected);
+    });
+
+    test("advertises split public and backchannel endpoint metadata", async () => {
+        const storage = MemoryStorage();
+        const app = new Hono();
+        registerUserInfoRoutes(app, storage, {
+            issuerUrl: "https://issuer.op.example/",
+            publicBaseUrl: "https://public.op.example/",
+            backchannelBaseUrl: "https://backchannel.op.example/",
+        });
+
+        const response = await app.request("https://internal.example/.well-known/openid-configuration");
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+            issuer: "https://issuer.op.example",
+            authorization_endpoint: "https://public.op.example/authorize",
+            token_endpoint: "https://backchannel.op.example/token",
+            jwks_uri: "https://backchannel.op.example/.well-known/jwks.json",
+            userinfo_endpoint: "https://backchannel.op.example/userinfo",
+        });
+    });
+
+    test("verifies userinfo access tokens against configured issuer", async () => {
+        const storage = MemoryStorage();
+        const app = new Hono();
+        registerUserInfoRoutes(app, storage, {
+            issuerUrl: "https://issuer.op.example",
+            backchannelBaseUrl: "https://backchannel.op.example",
+        });
+
+        const token = await createAccessToken(storage, {
+            mode: "access",
+            type: "user",
+            aud: "client",
+            iss: "https://issuer.op.example",
+            sub: "icecream",
+            properties: {
+                sub: "icecream",
+                name: "Ice Cream",
+            },
+        });
+
+        const accepted = await app.request("https://backchannel.op.example/userinfo", {
+            headers: { authorization: `Bearer ${token}` },
+        });
+        expect(accepted.status).toBe(200);
+        expect(await accepted.json()).toEqual({
+            sub: "icecream",
+            name: "Ice Cream",
+        });
+
+        const wrongIssuerToken = await createAccessToken(storage, {
+            mode: "access",
+            type: "user",
+            aud: "client",
+            iss: "https://backchannel.op.example",
+            sub: "icecream",
+            properties: {
+                sub: "icecream",
+                name: "Ice Cream",
+            },
+        });
+
+        const rejected = await app.request("https://backchannel.op.example/userinfo", {
+            headers: { authorization: `Bearer ${wrongIssuerToken}` },
+        });
+        expect(rejected.status).toBe(401);
     });
 });
