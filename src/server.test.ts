@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createLocalJWKSet, decodeProtectedHeader, jwtVerify, type JSONWebKeySet } from "jose";
+import { Buffer } from "node:buffer";
 
 import type { ClientsBackend, Client } from "./clients/client";
 import { createApp } from "./server";

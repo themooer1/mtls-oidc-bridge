@@ -3,9 +3,9 @@
   "module": "src/index.ts",
   "scripts": {
     "dev": "bun --watch src/main.ts",
-    "test": "bun test",
+    "test": "bun test $(find src -name '*.test.ts' -print)",
     "test:ldap": "node --import tsx --test src/users/ldap.integration.ts",
-    "test:all": "bun test && node --import tsx --test src/users/ldap.integration.ts"
+    "test:all": "bun test $(find src -name '*.test.ts' -print) && node --import tsx --test src/users/ldap.integration.ts"
   },
   "type": "module",
   "private": true,

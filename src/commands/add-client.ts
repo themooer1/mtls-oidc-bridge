@@ -4,6 +4,7 @@ import { createClientsBackend } from '../clients/factory';
 import type { Client } from '../clients/client';
 import { ClientsBackendConfigSchema } from '../clients/config';
 import { clientsBackendOptions } from './shared';
+import { Buffer } from 'node:buffer';
 import * as crypto from 'crypto';
 
 // ---------------------------------------------------------------------------

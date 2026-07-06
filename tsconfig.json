@@ -36,5 +36,7 @@
     "strictBindCallApply": true,
     "strictPropertyInitialization": true,
     "useUnknownInCatchVariables": true
-  }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["integration tests/conformance-suite"]
 }

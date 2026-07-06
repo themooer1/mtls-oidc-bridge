@@ -2,6 +2,7 @@ import { issuer } from "@openauthjs/openauth";
 import { signingKeys } from "@openauthjs/openauth/keys";
 import { MemoryStorage } from "@openauthjs/openauth/storage/memory";
 import { Storage, type StorageAdapter } from "@openauthjs/openauth/storage/storage";
+import { Buffer } from "node:buffer";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { SignJWT, type JWTPayload } from "jose";
