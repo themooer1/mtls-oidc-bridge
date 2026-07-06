@@ -20,6 +20,18 @@ export const AddClientConfigSchema = v.intersect([
 ]);
 
 export type AddClientConfig = v.InferOutput<typeof AddClientConfigSchema>;
+type AddClientCliOptions = Omit<AddClientConfig, 'redirectUris'> & {
+    redirectUri?: string | string[];
+};
+
+export function normalizeAddClientOptions(opts: AddClientCliOptions): AddClientConfig {
+    const { redirectUri, ...rest } = opts;
+
+    return {
+        ...rest,
+        redirectUris: Array.isArray(redirectUri) ? redirectUri : [redirectUri].filter((uri): uri is string => !!uri),
+    };
+}
 
 // ---------------------------------------------------------------------------
 // Command implementation
@@ -81,4 +93,4 @@ export const addClientCmd = new Command('add-client')
 clientsBackendOptions().forEach((o) => addClientCmd.addOption(o));
 
 addClientCmd.action(async (clientId: string, opts) =>
-    await addClient(clientId, v.parse(AddClientConfigSchema, opts)));
+    await addClient(clientId, v.parse(AddClientConfigSchema, normalizeAddClientOptions(opts))));
