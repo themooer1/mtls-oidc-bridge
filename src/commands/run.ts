@@ -5,7 +5,7 @@ import { createUserBackend } from '../users/factory';
 import { ProviderConfigSchema } from '../provider/config';
 import { UserBackendConfigSchema } from '../users/config';
 import { ClientsBackendConfigSchema } from '../clients/config';
-import { userBackendOptions, clientsBackendOptions } from './shared';
+import { userBackendOptions, clientsBackendOptions, requireSelectedUserBackendOptions } from './shared';
 import { createClientsBackend as createClientBackend } from '../clients/factory';
 import { log } from '../logger';
 
@@ -77,4 +77,7 @@ export const runCmd = new Command('run')
 userBackendOptions().forEach((o) => runCmd.addOption(o));
 clientsBackendOptions().forEach((o) => runCmd.addOption(o));
 
-runCmd.action((opts) => run(v.parse(RunConfigSchema, opts)));
+runCmd.action((opts) => {
+    requireSelectedUserBackendOptions(runCmd, opts);
+    return run(v.parse(RunConfigSchema, opts));
+});

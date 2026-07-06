@@ -1,4 +1,12 @@
-import { Option } from 'commander';
+import { Command, Option } from 'commander';
+
+type UserBackendCliOptions = {
+    userBackend?: string;
+    userFilePath?: string;
+    ldapUrl?: string;
+    ldapBindDn?: string;
+    ldapBindPassword?: string;
+};
 
 /**
  * CLI Options for the user backend, shared by any command that needs to look up users.
@@ -21,6 +29,23 @@ export const userBackendOptions = () => [
     new Option('--ldap-bind-dn <dn>',       '[ldap backend] Bind DN').env('LDAP_BIND_DN'),
     new Option('--ldap-bind-password <pw>', '[ldap backend] Bind password').env('LDAP_BIND_PASSWORD'),
 ];
+
+export function requireSelectedUserBackendOptions(command: Command, opts: UserBackendCliOptions): void {
+    switch (opts.userBackend) {
+        case 'file':
+            if (!opts.userFilePath)
+                command.error("required option '--user-file-path <path>' not specified for file user backend");
+            break;
+        case 'ldap':
+            if (!opts.ldapUrl)
+                command.error("required option '--ldap-url <url>' not specified for ldap user backend");
+            if (!opts.ldapBindDn)
+                command.error("required option '--ldap-bind-dn <dn>' not specified for ldap user backend");
+            if (!opts.ldapBindPassword)
+                command.error("required option '--ldap-bind-password <pw>' not specified for ldap user backend");
+            break;
+    }
+}
 
 /**
  * CLI Options for the clients backend, shared by any command that needs to manage clients.
