@@ -30,12 +30,12 @@ export const clientsBackendOptions = () => [
     new Option(
         '--clients-backend <backend>',
         'Clients store backend (file)',
-    ).env('CLIENTS_BACKEND').choices(['file']).default('file'),
+    ).env('CLIENTS_BACKEND').choices(['file']).makeOptionMandatory(),
 
     new Option(
         '--clients-file-path <path>',
         '[file backend] Path to the clients JSON store',
-    ).env('CLIENTS_FILE_PATH'),
+    ).env('CLIENTS_FILE_PATH').makeOptionMandatory(),
 ];
 
 /**
