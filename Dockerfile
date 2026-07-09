@@ -7,7 +7,6 @@ COPY src ./src
 COPY bun.lock ./
 COPY package.json ./
 COPY tsconfig.json ./
-
 RUN bun install
 
 

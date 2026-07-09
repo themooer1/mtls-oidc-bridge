@@ -3,8 +3,7 @@ import { createLocalJWKSet, decodeProtectedHeader, jwtVerify, type JSONWebKeySet
 import { Buffer } from "node:buffer";
 
 import type { ClientsBackend, Client } from "./clients/client";
-import { createApp } from "./server";
-import type { EndpointMetadataConfig } from "./userinfo";
+import { createApp, type EndpointMetadataConfig } from "./server";
 import type { UserBackend, UserClaims } from "./users/users";
 
 const redirectUri = "https://rp.example/callback";
@@ -17,10 +16,18 @@ const createTestApp = async (endpointConfig: EndpointMetadataConfig = {}) => {
         hashed_secret: await Bun.password.hash(secret, { algorithm: "bcrypt" }),
         redirect_uris: [redirectUri],
     };
+    const publicClient: Client = {
+        id: "public-client",
+        type: "public",
+        redirect_uris: [redirectUri],
+    };
 
     const clients: ClientsBackend = {
         async getClient(clientId) {
-            return clientId === client.id ? client : null;
+            return {
+                [client.id]: client,
+                [publicClient.id]: publicClient,
+            }[clientId] ?? null;
         },
         async setClient() {},
     };
@@ -47,16 +54,21 @@ const createTestApp = async (endpointConfig: EndpointMetadataConfig = {}) => {
             endpointConfig,
         ),
         client,
+        publicClient,
         secret,
     };
 };
 
-const authorize = async (app: ReturnType<typeof createApp>): Promise<string> => {
+const authorize = async (
+    app: ReturnType<typeof createApp>,
+    clientId = "oidcc-client",
+): Promise<string> => {
     const url = new URL("http://auth.example/authorize");
-    url.searchParams.set("client_id", "oidcc-client");
+    url.searchParams.set("client_id", clientId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", "openid");
+    url.searchParams.set("scope", "openid profile email");
+    url.searchParams.set("nonce", "nonce-123");
     url.searchParams.set("state", "state-123");
 
     let response: Response | null = null;
@@ -154,6 +166,7 @@ describe("createApp", () => {
             iss: "http://auth.example",
             sub: "icecream",
             aud: client.id,
+            nonce: "nonce-123",
             name: "Ice Cream",
             email: "icecream@cone.example",
         });
@@ -176,6 +189,85 @@ describe("createApp", () => {
         const refreshedPayload = await refreshed.json() as Record<string, unknown>;
         expect(typeof refreshedPayload["access_token"]).toBe("string");
         expect(refreshedPayload["id_token"]).toBeUndefined();
+    });
+
+    test("enforces connector public and private client auth rules", async () => {
+        const { app, publicClient, secret } = await createTestApp();
+        const privateCode = await authorize(app);
+
+        const missingSecret = await app.request("http://auth.example/token", {
+            method: "POST",
+            headers: {
+                "content-type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+                grant_type: "authorization_code",
+                code: privateCode,
+                redirect_uri: redirectUri,
+                client_id: "oidcc-client",
+            }),
+        });
+        expect(missingSecret.status).toBe(401);
+
+        const publicCode = await authorize(app, publicClient.id);
+        const publicAccepted = await app.request("http://auth.example/token", {
+            method: "POST",
+            headers: {
+                "content-type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+                grant_type: "authorization_code",
+                code: publicCode,
+                redirect_uri: redirectUri,
+                client_id: publicClient.id,
+            }),
+        });
+        expect(publicAccepted.status).toBe(200);
+        expect(await publicAccepted.json()).toMatchObject({
+            token_type: "Bearer",
+            id_token: expect.any(String),
+        });
+
+        const publicSecretCode = await authorize(app, publicClient.id);
+        const publicRejected = await app.request("http://auth.example/token", {
+            method: "POST",
+            headers: {
+                "content-type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+                grant_type: "authorization_code",
+                code: publicSecretCode,
+                redirect_uri: redirectUri,
+                client_id: publicClient.id,
+                client_secret: secret,
+            }),
+        });
+        expect(publicRejected.status).toBe(401);
+    });
+
+    test("accepts client_secret_post for private clients", async () => {
+        const { app, client, secret } = await createTestApp();
+        const code = await authorize(app);
+
+        const response = await app.request("http://auth.example/token", {
+            method: "POST",
+            headers: {
+                "content-type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+                grant_type: "authorization_code",
+                code,
+                redirect_uri: redirectUri,
+                client_id: client.id,
+                client_secret: secret,
+            }),
+        });
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+            token_type: "Bearer",
+            id_token: expect.any(String),
+        });
     });
 
     test("rejects malformed client_secret_basic credentials", async () => {
